@@ -4,6 +4,7 @@ import api from './api'
 
 interface ApiComponent {
   _id: string
+  sku?: string
   name: string
   brand: string
   price: number
@@ -79,6 +80,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
           return [{
             id: component._id,
+            sku: component.sku,
             cat,
             name: component.name,
             brand: component.brand,

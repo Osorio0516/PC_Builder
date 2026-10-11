@@ -1,7 +1,11 @@
+import { ProductImage } from './ProductImage'
+import { cleanDescription } from './cleanDescription'
 import { useState, type ReactNode } from 'react'
 import { CATS, analyze, find, money, total, type Cat, type Items, type Part } from './data'
 import { useStore } from './store'
 
+// Navigation helper is also used by App.
+// eslint-disable-next-line react-refresh/only-export-components
 export const go = (to: string) => { location.hash = '#/' + to }
 const A = ({ to, cls, children }: { to: string; cls?: string; children: ReactNode }) => <a href={'#/' + to} className={cls}>{children}</a>
 const Tag = ({ k = '', children }: { k?: string; children: ReactNode }) => <span className={'k ' + k}>{children}</span>
@@ -101,10 +105,10 @@ export function Catalog({ cat }: { cat?: string }) {
           const inBuild = draft[p.cat] === p.id
           const other = !inBuild && !!draft[p.cat]
           return <div className="c card" key={p.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div className="ph" style={{ height: 90, marginBottom: 8 }}>{p.cat}</div>
+            <div style={{ marginBottom: 8 }}><ProductImage part={p} height={90} /></div>
             <span className="m">{p.brand}</span>
             <h3><A to={'part/' + p.id} cls="t">{p.name}</A></h3>
-            <div className="m" style={{ flex: 1 }}>{p.spec}</div>
+            <div className="m" style={{ flex: 1 }}>{cleanDescription(p.spec)}</div>
             <div className="f" style={{ marginTop: 10 }}>
               <b style={{ flex: 1, fontSize: 18 }}>{money(p.price)}</b>
               {inBuild
@@ -121,7 +125,7 @@ export function Details({ id }: { id: string }) {
   const { parts, pick } = useStore()
   const p = find(parts, id)
   if (!p) return <div className="p"><p>Part not found.</p><A to="catalog" cls="o">Back to catalog</A></div>
-  const rows: [string, string][] = [['Brand', p.brand], ['Category', p.cat], ['Details', p.spec]]
+  const rows: [string, string][] = [['Brand', p.brand], ['Category', p.cat], ['Details', cleanDescription(p.spec)]]
   if (p.socket) rows.push(['Socket', p.socket])
   if (p.ddr) rows.push(['Memory type', p.ddr])
   if (p.watts) rows.push([p.cat === 'PSU' ? 'Output' : 'Power draw', p.watts + ' W'])
@@ -130,7 +134,7 @@ export function Details({ id }: { id: string }) {
   return <div className="p">
     <span className="m"><A to="catalog" cls="t">Catalog</A> / {p.cat} / {p.name}</span>
     <div className="g cols" style={{ gridTemplateColumns: '1fr 1fr', gap: 40 }}>
-      <div className="ph" style={{ minHeight: 340 }}>Product image</div>
+      <ProductImage part={p} height={340} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <h1 style={{ fontSize: 36 }}>{p.brand} {p.name}</h1><h2 style={{ fontSize: 32 }}>{money(p.price)}</h2>
         <div className="f w"><button className="b" onClick={() => { pick(p.cat, p.id); go('builder') }}>Add to build</button><A to="catalog" cls="o">Back to catalog</A></div>
@@ -148,7 +152,7 @@ export function Builder() {
   return <div className="p row" style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
     <div className="c" style={{ flex: 1 }}><h2>Untitled build</h2>
       {CATS.map((c) => { const sel = find(parts, draft[c]); return <div className="r w" key={c}>
-        <div style={{ minWidth: 180 }}><div className="m">{c}</div><div>{sel ? sel.brand + ' ' + sel.name : <span className="s">Not selected</span>}</div>{sel && <div className="m">{sel.spec}</div>}</div>
+        <div style={{ minWidth: 180 }}><div className="m">{c}</div><div>{sel ? sel.brand + ' ' + sel.name : <span className="s">Not selected</span>}</div>{sel && <div className="m">{cleanDescription(sel.spec)}</div>}</div>
         {sel && <span>{money(sel.price)}</span>}
         <select className="i" style={{ width: 210 }} aria-label={'Choose ' + c} value={draft[c] ?? ''} onChange={(e) => pick(c, e.target.value)}>
           <option value="">Choose {c}</option>{parts.filter((p) => p.cat === c).map((p) => <option key={p.id} value={p.id}>{p.name} · {money(p.price)}</option>)}
@@ -257,7 +261,7 @@ export function Admin() {
     <div className="c" style={{ flex: 1 }}>
       <div className="f w"><h2 style={{ flex: 1 }}>Catalog parts</h2><input className="i" aria-label="Search" placeholder="Search" style={{ width: 200 }} value={q} onChange={(e) => setQ(e.target.value)} /><button className="b" onClick={() => setF(blank)}>Add part</button></div>
       {parts.filter((p) => (p.brand + p.name + p.cat).toLowerCase().includes(q.toLowerCase())).map((p) => <div className="r" key={p.id}>
-        <div>{p.brand} {p.name}<div className="m">{p.cat} · {p.spec}</div></div><span>{money(p.price)}</span>
+        <div>{p.brand} {p.name}<div className="m">{p.cat} · {cleanDescription(p.spec)}</div></div><span>{money(p.price)}</span>
         <button className="o" onClick={() => setF(p)}>Edit</button>
         <button className="o" onClick={() => { if (confirm(`Delete ${p.name}?`)) delPart(p.id) }}>Delete</button></div>)}
     </div>

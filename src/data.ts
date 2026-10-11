@@ -1,7 +1,7 @@
 export const CATS = ['CPU', 'Motherboard', 'RAM', 'GPU', 'Storage', 'PSU', 'Case', 'CPU Cooler'] as const
 export type Cat = (typeof CATS)[number]
 export interface Part {
-  id: string; cat: Cat; name: string; brand: string; price: number; spec: string
+  id: string; sku?: string; cat: Cat; name: string; brand: string; price: number; spec: string
   socket?: string; ddr?: string; watts?: number; len?: number; maxGpu?: number
 }
 export type Items = Partial<Record<Cat, string>>

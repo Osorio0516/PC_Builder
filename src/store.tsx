@@ -1,5 +1,39 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { PARTS, type Build, type Cat, type Items, type Part } from './data'
+import { type Build, type Cat, type Items, type Part } from './data'
+import api from './api'
+
+interface ApiComponent {
+  _id: string
+  name: string
+  brand: string
+  price: number
+  description?: string
+  active: boolean
+  categoryId: {
+    _id: string
+    name: string
+    slug: string
+  }
+  specs: {
+    socket?: string
+    memoryType?: string
+    powerWatts?: number
+    wattage?: number
+    lengthMm?: number
+    maxGpuLengthMm?: number
+  }
+}
+
+const categoryMap: Record<string, Cat> = {
+  cpu: 'CPU',
+  motherboard: 'Motherboard',
+  ram: 'RAM',
+  gpu: 'GPU',
+  storage: 'Storage',
+  psu: 'PSU',
+  case: 'Case',
+  'cpu-cooler': 'CPU Cooler',
+}
 
 const SEED: Build[] = [
   { id: 'b1', name: 'Living Room 1440p', items: { CPU: 'cpu1', Motherboard: 'mb1', RAM: 'ram1', GPU: 'gpu1', Storage: 'ssd1', PSU: 'psu1', Case: 'case1' } },
@@ -24,9 +58,57 @@ interface Store {
 const Ctx = createContext<Store | null>(null)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [parts, setParts] = useLocal<Part[]>('rf-parts', PARTS)
+  const [parts, setParts] = useState<Part[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [builds, setBuilds] = useLocal<Build[]>('rf-builds', SEED)
   const [draft, setDraft] = useLocal<Items>('rf-draft', {})
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadParts() {
+      try {
+        const response = await api.get<{ data: ApiComponent[] }>('/components', {
+          params: { active: true, limit: 100 },
+        })
+
+        const loadedParts: Part[] = response.data.data.flatMap((component) => {
+          const cat = categoryMap[component.categoryId.slug]
+          if (!cat) return []
+
+          return [{
+            id: component._id,
+            cat,
+            name: component.name,
+            brand: component.brand,
+            price: component.price,
+            spec: component.description ?? '',
+            socket: component.specs.socket,
+            ddr: component.specs.memoryType,
+            watts: component.categoryId.slug === 'psu'
+              ? component.specs.wattage
+              : component.specs.powerWatts,
+            len: component.specs.lengthMm,
+            maxGpu: component.specs.maxGpuLengthMm,
+          }]
+        })
+
+        if (!cancelled) setParts(loadedParts)
+      } catch {
+        if (!cancelled) setError('Could not load components. Check that the backend is running.')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    void loadParts()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const uid = () => 'b' + Date.now().toString(36)
   const value: Store = {
     parts, builds, draft, setDraft,
@@ -38,7 +120,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     upsertPart: (p) => setParts((a) => (a.some((x) => x.id === p.id) ? a.map((x) => (x.id === p.id ? p : x)) : [...a, p])),
     delPart: (id) => setParts((a) => a.filter((x) => x.id !== id)),
   }
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
+  return (
+    <Ctx.Provider value={value}>
+      {loading ? (
+        <p className="state" role="status">Loading components...</p>
+      ) : error ? (
+        <p className="state" role="alert">{error}</p>
+      ) : (
+        children
+      )}
+    </Ctx.Provider>
+  )
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

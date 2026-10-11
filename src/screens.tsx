@@ -11,9 +11,9 @@ const Head = ({ t, sub, children }: { t: string; sub?: string; children?: ReactN
 function Tags({ items, parts }: { items: Items; parts: Part[] }) {
   const r = analyze(items, parts)
   return <span className="f w">
-    {r.bad.length > 0 && <Tag k="x">{r.bad.length} CONFLICT</Tag>}
-    {r.ok.length > 0 && <Tag>{r.ok.length} OK</Tag>}
-    <Tag k="w2">{r.todo.length} NOT CHECKED</Tag>
+    {r.bad.length > 0 && <Tag k="x">{r.bad.length} {r.bad.length === 1 ? 'conflict' : 'conflicts'}</Tag>}
+    {r.ok.length > 0 && <Tag k="ok">{r.ok.length} compatible</Tag>}
+    <Tag k="w2">{r.todo.length} not checked</Tag>
   </span>
 }
 function useItems(id: string) {
@@ -27,13 +27,12 @@ export function Landing() {
   return <>
     <div className="p row" style={{ flexDirection: 'row', gap: 56, alignItems: 'center', paddingTop: 72 }}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 24 }}>
-        <span className="m">PC BUILDER · COMPATIBILITY-CHECKED</span>
         <h1 style={{ fontSize: 56 }}>Pick every part.<br />Know it all fits.</h1>
         <p className="s" style={{ fontSize: 18, maxWidth: 480 }}>Choose a CPU, motherboard, RAM, GPU, storage, PSU and case, watch the total as you go, and get a compatibility report before you buy.</p>
         <div className="f"><A to="builder" cls="b">Start a build</A><A to="catalog" cls="o">Browse parts</A></div>
       </div>
-      <div className="c" style={{ flex: 1 }}>
-        <div className="f"><h3 style={{ flex: 1 }}>Sample build</h3><Tag>4 PARTS</Tag></div>
+      <div className="c board" style={{ flex: 1 }}>
+        <div className="f"><h3 style={{ flex: 1 }}>Sample build</h3><Tag>4 parts</Tag></div>
         {top.map((p) => <div className="r" key={p.id}><div><div className="m">{p.cat}</div>{p.brand} {p.name}</div><span>{money(p.price)}</span></div>)}
         <div className="f" style={{ paddingTop: 16 }}><span className="s" style={{ flex: 1 }}>Total so far</span><h2>{money(top.reduce((s, p) => s + p.price, 0))}</h2></div>
       </div>
@@ -50,10 +49,10 @@ export function Dashboard() {
   const sums = builds.map((b) => total(b.items, parts))
   const sum = sums.reduce((a, b) => a + b, 0)
   const last = builds[builds.length - 1]
-  const stats: [string, string][] = [['SAVED BUILDS', String(builds.length)], ['TOTAL VALUE', money(sum)], ['AVERAGE BUILD', money(builds.length ? Math.round(sum / builds.length) : 0)], ['CATALOG PARTS', String(parts.length)]]
+  const stats: [string, string][] = [['Saved builds', String(builds.length)], ['Total value', money(sum)], ['Average build', money(builds.length ? Math.round(sum / builds.length) : 0)], ['Catalog parts', String(parts.length)]]
   return <div className="p">
     <Head t="Dashboard" sub="Overview of your saved builds"><A to="builder" cls="b">New build</A></Head>
-    <div className="g cols" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>{stats.map(([a, b]) => <div className="c" key={a}><div className="m">{a}</div><h1 style={{ fontSize: 36, marginTop: 8 }}>{b}</h1></div>)}</div>
+    <div className="g cols" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>{stats.map(([a, b]) => <div className="c" key={a}><div className="m">{a}</div><h1 style={{ fontSize: 34, marginTop: 6 }}>{b}</h1></div>)}</div>
     <div className="g cols" style={{ gridTemplateColumns: '1fr 1fr' }}>
       <div className="c"><h2>Recent builds</h2>
         {builds.length === 0 && <p className="s" style={{ marginTop: 12 }}>No saved builds yet.</p>}
@@ -62,37 +61,59 @@ export function Dashboard() {
       <div className="c"><h2 style={{ marginBottom: 8 }}>Cost by category{last ? ' · ' + last.name : ''}</h2>
         {last && CATS.map((c) => { const p = find(parts, last.items[c]); return <div className="r" key={c} style={{ border: 0, padding: '8px 0' }}>
           <span className="s" style={{ width: 100, flex: 'none' }}>{c}</span>
-          <div style={{ flex: 1, background: '#262C36', borderRadius: 4, height: 10 }}><div style={{ width: `${((p?.price ?? 0) / 600) * 100}%`, background: '#4C9AFF', height: 10, borderRadius: 4 }} /></div>
+          <div className="bar"><div style={{ width: `${Math.min(100, ((p?.price ?? 0) / 600) * 100)}%` }} /></div>
           <span style={{ width: 56, textAlign: 'right', flex: 'none' }}>{p ? money(p.price) : '—'}</span></div> })}
       </div>
     </div>
   </div>
 }
 
-export function Catalog() {
-  const { parts, pick } = useStore()
+export function Catalog({ cat }: { cat?: string }) {
+  const { parts, draft, pick } = useStore()
+  const initial = CATS.find((c) => c === decodeURIComponent(cat ?? ''))
   const [q, setQ] = useState('')
-  const [cats, setCats] = useState<Cat[]>([])
-  const [max, setMax] = useState(1000)
-  const shown = parts.filter((p) => (!cats.length || cats.includes(p.cat)) && p.price <= max && (p.brand + ' ' + p.name + ' ' + p.spec).toLowerCase().includes(q.toLowerCase()))
-  return <div className="p row" style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-    <div className="c side" style={{ width: 220, display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <h3>Category</h3>
-      {CATS.map((c) => <label key={c} className="ck"><input type="checkbox" checked={cats.includes(c)} onChange={() => setCats((a) => (a.includes(c) ? a.filter((x) => x !== c) : [...a, c]))} />{c}</label>)}
-      <label style={{ marginTop: 16 }}>Max price ($)<input className="i" type="number" value={max} onChange={(e) => setMax(Number(e.target.value))} /></label>
+  const [sel, setSel] = useState<Cat | ''>(initial ?? '')
+  const [max, setMax] = useState('')
+  const [sort, setSort] = useState('name')
+  const limit = max === '' ? Infinity : Number(max)
+  const shown = parts
+    .filter((p) => (!sel || p.cat === sel) && p.price <= limit && (p.brand + ' ' + p.name + ' ' + p.spec).toLowerCase().includes(q.trim().toLowerCase()))
+    .sort((a, b) => (sort === 'low' ? a.price - b.price : sort === 'high' ? b.price - a.price : (a.brand + a.name).localeCompare(b.brand + b.name)))
+  const dirty = q !== '' || sel !== '' || max !== ''
+  const clear = () => { setQ(''); setSel(''); setMax('') }
+  const count = (c: Cat) => parts.filter((p) => p.cat === c).length
+  return <div className="p">
+    <Head t="Parts" sub={`${shown.length} of ${parts.length} parts. Add the ones you like to your current build.`}><A to="builder" cls="o">Go to build</A></Head>
+    <div className="chips" role="group" aria-label="Filter by category">
+      <button className={'chip' + (sel === '' ? ' on' : '')} aria-pressed={sel === ''} onClick={() => setSel('')}>All ({parts.length})</button>
+      {CATS.map((c) => <button key={c} className={'chip' + (sel === c ? ' on' : '')} aria-pressed={sel === c} onClick={() => setSel(sel === c ? '' : c)}>{c} ({count(c)})</button>)}
     </div>
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <input className="i" aria-label="Search parts" placeholder={`Search ${parts.length} parts`} value={q} onChange={(e) => setQ(e.target.value)} />
-      <div className="g cols" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
-        {shown.map((p) => <div className="c" key={p.id}>
-          <div className="ph" style={{ height: 90 }}>{p.cat}</div>
-          <h3 style={{ marginTop: 14 }}><A to={'part/' + p.id} cls="t">{p.brand} {p.name}</A></h3>
-          <div className="m" style={{ margin: '6px 0 14px' }}>{p.spec}</div>
-          <div className="f"><b style={{ flex: 1, fontSize: 18 }}>{money(p.price)}</b><button className="o" onClick={() => { pick(p.cat, p.id); go('builder') }}>Add</button></div>
-        </div>)}
-      </div>
-      {shown.length === 0 && <p className="s">No parts match your filters.</p>}
+    <div className="toolbar">
+      <label style={{ flex: 1, minWidth: 220 }}>Search<input className="i" placeholder="Try &quot;Ryzen&quot; or &quot;DDR5&quot;" value={q} onChange={(e) => setQ(e.target.value)} /></label>
+      <label style={{ width: 160 }}>Max price (PHP)<input className="i" type="number" min={0} placeholder="No limit" value={max} onChange={(e) => setMax(e.target.value)} /></label>
+      <label style={{ width: 190 }}>Sort by<select className="i" value={sort} onChange={(e) => setSort(e.target.value)}><option value="name">Name</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option></select></label>
+      {dirty && <button className="o" onClick={clear}>Clear filters</button>}
     </div>
+    {shown.length === 0
+      ? <div className="c empty"><h3>No parts match</h3><p className="s">Try a different search, raise the max price or pick another category.</p><button className="b" onClick={clear}>Clear filters</button></div>
+      : <div className="grid-auto">
+        {shown.map((p) => {
+          const inBuild = draft[p.cat] === p.id
+          const other = !inBuild && !!draft[p.cat]
+          return <div className="c card" key={p.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className="ph" style={{ height: 90, marginBottom: 8 }}>{p.cat}</div>
+            <span className="m">{p.brand}</span>
+            <h3><A to={'part/' + p.id} cls="t">{p.name}</A></h3>
+            <div className="m" style={{ flex: 1 }}>{p.spec}</div>
+            <div className="f" style={{ marginTop: 10 }}>
+              <b style={{ flex: 1, fontSize: 18 }}>{money(p.price)}</b>
+              {inBuild
+                ? <button className="o on" title="Click to remove from your build" onClick={() => pick(p.cat, '')}>Added ✓</button>
+                : <button className="o" title={other ? `Replaces your current ${p.cat}` : undefined} onClick={() => pick(p.cat, p.id)}>{other ? 'Replace' : 'Add'}</button>}
+            </div>
+          </div>
+        })}
+      </div>}
   </div>
 }
 
@@ -113,7 +134,7 @@ export function Details({ id }: { id: string }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <h1 style={{ fontSize: 36 }}>{p.brand} {p.name}</h1><h2 style={{ fontSize: 32 }}>{money(p.price)}</h2>
         <div className="f w"><button className="b" onClick={() => { pick(p.cat, p.id); go('builder') }}>Add to build</button><A to="catalog" cls="o">Back to catalog</A></div>
-        <div className="c"><h3>Specifications</h3>{rows.map(([a, b]) => <div className="r" key={a}><span className="s">{a}</span><span className="m" style={{ color: '#E8EAED', flex: 'none' }}>{b}</span></div>)}</div>
+        <div className="c"><h3>Specifications</h3>{rows.map(([a, b]) => <div className="r" key={a}><span className="s">{a}</span><span className="m" style={{ color: 'var(--tx)', flex: 'none' }}>{b}</span></div>)}</div>
       </div>
     </div>
   </div>
@@ -131,11 +152,12 @@ export function Builder() {
         {sel && <span>{money(sel.price)}</span>}
         <select className="i" style={{ width: 210 }} aria-label={'Choose ' + c} value={draft[c] ?? ''} onChange={(e) => pick(c, e.target.value)}>
           <option value="">Choose {c}</option>{parts.filter((p) => p.cat === c).map((p) => <option key={p.id} value={p.id}>{p.name} · {money(p.price)}</option>)}
-        </select></div> })}
+        </select><A to={'catalog/' + encodeURIComponent(c)} cls="o">Browse</A></div> })}
     </div>
     <div className="c side" style={{ width: 300, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <h3>Summary</h3>
-      <div className="f"><span className="s" style={{ flex: 1 }}>Parts</span>{n} of 7</div>
+      <div className="f"><span className="s" style={{ flex: 1 }}>Parts</span>{n} of {CATS.length}</div>
+      <div className="bar" style={{ flex: 'none' }}><div style={{ width: `${(n / CATS.length) * 100}%` }} /></div>
       <div className="f"><span className="s" style={{ flex: 1 }}>Est. power</span>≈ {r.watts} W</div>
       <div className="f"><span className="s" style={{ flex: 1 }}>Total</span><h2>{money(total(draft, parts))}</h2></div>
       <Tags items={draft} parts={parts} />
@@ -151,7 +173,7 @@ export function MyBuilds() {
   const { builds, parts, rename, dup, del, setDraft } = useStore()
   return <div className="p">
     <Head t="My builds" sub="Open, rename, duplicate or delete your saved builds"><A to="builder" cls="b">New build</A></Head>
-    <div className="g cols" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
+    <div className="g cols" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(270px,1fr))' }}>
       {builds.map((b) => <div className="c" key={b.id} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <h3><A to={'build/' + b.id} cls="t">{b.name}</A></h3>
         <span className="m">{CATS.filter((c) => b.items[c]).length} parts</span><h2>{money(total(b.items, parts))}</h2>
@@ -199,7 +221,7 @@ export function Report({ id }: { id: string }) {
   return <div className="p">
     <Head t="Compatibility report" sub={id === 'draft' ? 'Current build in the builder' : builds.find((b) => b.id === id)?.name}><A to={id === 'draft' ? 'builder' : 'build/' + id} cls="o">Back to build</A></Head>
     <div className="g cols" style={{ gridTemplateColumns: 'repeat(3,1fr)', alignItems: 'start' }}>
-      {col('Compatible', 'OK', r.ok, '')}{col('Conflicts', 'CONFLICT', r.bad, 'x')}{col('Not checked', 'UNCHECKED', r.todo, 'w2')}
+      {col('Compatible', 'OK', r.ok, 'ok')}{col('Conflicts', r.bad.length === 1 ? 'conflict' : 'conflicts', r.bad, 'x')}{col('Not checked', 'unchecked', r.todo, 'w2')}
     </div>
   </div>
 }
@@ -243,7 +265,7 @@ export function Admin() {
       <h3>{f.id ? 'Edit part' : 'Add part'}</h3>
       {input('Name', 'name')}{input('Brand', 'brand')}
       <label>Category<select className="i" value={f.cat} onChange={(e) => setF({ ...f, cat: e.target.value as Cat })}>{CATS.map((c) => <option key={c}>{c}</option>)}</select></label>
-      <label>Price ($)<input className="i" type="number" min={0} value={f.price} onChange={(e) => setF({ ...f, price: Number(e.target.value) })} /></label>
+      <label>Price (PHP)<input className="i" type="number" min={0} value={f.price} onChange={(e) => setF({ ...f, price: Number(e.target.value) })} /></label>
       {input('Key specs', 'spec')}
       <div className="f"><button className="b" disabled={!f.name.trim()} onClick={() => { upsertPart({ ...f, id: f.id || 'p' + Date.now().toString(36) }); setF(blank) }}>Save part</button><button className="o" onClick={() => setF(blank)}>Cancel</button></div>
     </div>

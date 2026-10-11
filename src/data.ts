@@ -1,4 +1,4 @@
-export const CATS = ['CPU', 'Motherboard', 'RAM', 'GPU', 'Storage', 'PSU', 'Case'] as const
+export const CATS = ['CPU', 'Motherboard', 'RAM', 'GPU', 'Storage', 'PSU', 'Case', 'CPU Cooler'] as const
 export type Cat = (typeof CATS)[number]
 export interface Part {
   id: string; cat: Cat; name: string; brand: string; price: number; spec: string
@@ -28,7 +28,11 @@ export const PARTS: Part[] = [
   { id: 'case2', cat: 'Case', brand: 'Cooler Master', name: 'Q300L', price: 59, spec: 'Micro-ATX tower · GPU up to 360 mm', maxGpu: 360 },
 ]
 
-export const money = (n: number) => '$' + n.toLocaleString()
+export const money = (amount: number) =>
+  new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+  }).format(amount)
 export const find = (parts: Part[], id?: string) => parts.find((p) => p.id === id)
 export const total = (items: Items, parts: Part[]) =>
   CATS.reduce((s, c) => s + (find(parts, items[c])?.price ?? 0), 0)

@@ -1,11 +1,27 @@
 import { useEffect, useState } from 'react'
-import { StoreProvider } from './store'
+import { StoreProvider, useStore } from './store'
+import { CATS } from './data'
 import * as S from './screens'
 
 const NAV: [string, string, string[]][] = [
-  ['dashboard', 'Dashboard', ['dashboard']], ['catalog', 'Catalog', ['catalog', 'part']], ['builder', 'Builder', ['builder']],
-  ['builds', 'My Builds', ['builds', 'build', 'report']], ['compare', 'Compare', ['compare']], ['admin', 'Admin', ['admin']],
+  ['dashboard', 'Dashboard', ['dashboard']], ['catalog', 'Parts', ['catalog', 'part']], ['builder', 'Build', ['builder']],
+  ['builds', 'My builds', ['builds', 'build', 'report']], ['compare', 'Compare', ['compare']], ['admin', 'Products', ['admin']],
 ]
+
+function NavBar({ route }: { route: string }) {
+  const { draft } = useStore()
+  const n = CATS.filter((c) => draft[c]).length
+  return (
+    <nav className="n" aria-label="Main">
+      <a className="brand" href="#/">RigForge</a>
+      {NAV.map(([to, label, on]) => (
+        <a key={to} href={'#/' + to} className={on.includes(route) ? 'on' : ''} aria-current={on.includes(route) ? 'page' : undefined}>
+          {label}{to === 'builder' && n > 0 && <span className="badge" title={`${n} parts in your current build`}>{n}</span>}
+        </a>
+      ))}
+    </nav>
+  )
+}
 
 function useHash() {
   const read = () => location.hash.replace(/^#\/?/, '').split('/')
@@ -23,7 +39,7 @@ export default function App() {
   const page = (() => {
     switch (route) {
       case 'dashboard': return <S.Dashboard />
-      case 'catalog': return <S.Catalog />
+      case 'catalog': return <S.Catalog key={id} cat={id} />
       case 'part': return <S.Details id={id} />
       case 'builder': return <S.Builder />
       case 'builds': return <S.MyBuilds />
@@ -36,11 +52,7 @@ export default function App() {
   })()
   return (
     <StoreProvider>
-      <nav className="n">
-        <b>RigForge</b>
-        {NAV.map(([to, label, on]) => <a key={to} href={'#/' + to} className={on.includes(route) ? 'on' : ''}>{label}</a>)}
-        <a className="b" href="#/builder">New build</a>
-      </nav>
+      <NavBar route={route} />
       {page}
     </StoreProvider>
   )
